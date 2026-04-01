@@ -2,7 +2,9 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-# DAG arguments
+# =========================
+# CONFIGURAÇÕES GERAIS
+# =========================
 default_args = {
     'owner': 'data_eng',
     'depends_on_past': False,
@@ -13,34 +15,52 @@ default_args = {
     'retry_delay': timedelta(minutes=2)
 }
 
-# DAG definition
+# =========================
+# CAMINHO DOS SCRIPTS (WINDOWS)
+# =========================
+BASE_PATH = "C:/Users/helle/OneDrive/Documentos"
+
+# =========================
+# DEFINIÇÃO DA DAG
+# =========================
 with DAG(
     dag_id='brewery_medallion_pipeline',
     default_args=default_args,
-    description='Pipeline Bronze -> Silver -> Gold para dados de cervejarias',
-    schedule_interval='0 2 * * *',  # executa todo dia às 2h da manhã
-    start_date=datetime(2026, 4, 1),
+    description='Pipeline ETL Bronze -> Silver -> Gold para dados de cervejarias',
+    schedule_interval='0 2 * * *',  # executa todo dia às 02:00
+    start_date=datetime(2024, 1, 1),  # boa prática
     catchup=False,
-    tags=['brewery', 'medallion', 'ETL']
+    tags=['data-engineering', 'medallion', 'brewery']
 ) as dag:
 
-    # Task 1: Extrair dados e salvar Bronze
+    # =========================
+    # TASK 1 - BRONZE
+    # =========================
     extract_bronze = BashOperator(
         task_id='extract_bronze',
-        bash_command='C:\Users\helle\OneDrive\Documentos/extract_breweries_bronze.py'
+        bash_command=f'python "{BASE_PATH}/extract_breweries_bronze.py"',
+        execution_timeout=timedelta(minutes=10)
     )
 
-    # Task 2: Processar Bronze e salvar Silver
-    save_silver = BashOperator(
-        task_id='save_silver',
-        bash_command='C:\Users\helle\OneDrive\Documentos/save_breweries_silver.py'
+    # =========================
+    # TASK 2 - SILVER
+    # =========================
+    transform_silver = BashOperator(
+        task_id='transform_silver',
+        bash_command=f'python "{BASE_PATH}/save_breweries_silver.py"',
+        execution_timeout=timedelta(minutes=10)
     )
 
-    # Task 3: Agregar Silver e salvar Gold
-    save_gold = BashOperator(
-        task_id='save_gold',
-        bash_command='C:\Users\helle\OneDrive\Documentos/save_breweries_gold.py'
+    # =========================
+    # TASK 3 - GOLD
+    # =========================
+    aggregate_gold = BashOperator(
+        task_id='aggregate_gold',
+        bash_command=f'python "{BASE_PATH}/save_breweries_gold.py"',
+        execution_timeout=timedelta(minutes=10)
     )
 
-    # Define a ordem de execução
-    extract_bronze >> save_silver >> save_gold
+    # =========================
+    # ORDEM DE EXECUÇÃO
+    # =========================
+    extract_bronze >> transform_silver >> aggregate_gold
